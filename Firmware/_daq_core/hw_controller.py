@@ -239,7 +239,7 @@ class HWC():
         t.sleep(1)
         mrf.genMode()
         t.sleep(1)
-        self.mrf.setCurrent(7)
+        self.mrf.setCurrent(3)
         #t.sleep(1)
 
         #self.mrf.getFreq()

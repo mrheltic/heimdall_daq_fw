@@ -734,6 +734,50 @@ class delaySynchronizer():
                             self.sync_failed_cntr = 0
 
                     else:
+                        # **ADD CONTINUOUS PHASE MONITORING HERE** for normal data frames
+                        # This runs during normal DoA operation when cal_track_mode == 0
+                        # or when processing DATA frames
+                        
+                        # Calculate current phase relationships
+                        dyn_ranges, iq_diffs = self.calc_iq_sync(iq_samples)
+                        iq_diffs *= self.iq_adjust[:]
+                        
+                        # Apply current corrections to see actual phases after correction
+                        corrected_phases = np.angle(iq_diffs * self.iq_corrections)
+                        
+                        # Log phase information periodically (every N frames to avoid log spam)
+                        if self.iq_header.cpi_index % 10 == 0:  # Log every 10 frames
+                            self.logger.critical("="*70)
+                            self.logger.critical(f"Phase Monitor - Frame: {self.iq_header.cpi_index}, RF: {self.iq_header.rf_center_freq/1e6:.2f} MHz")
+                            self.logger.critical("-"*70)
+                            
+                            # Raw phases (before correction)
+                            self.logger.critical("Raw Phases (relative to Ch 0):")
+                            for m in range(self.M):
+                                raw_phase = np.rad2deg(np.angle(iq_diffs[m]))
+                                raw_amp = 20*np.log10(abs(iq_diffs[m]))
+                                self.logger.critical(f"  Ch{m}: Phase={raw_phase:+7.2f}°  Amp={raw_amp:+6.2f}dB")
+                            
+                            self.logger.critical("-"*70)
+                            
+                            # Applied corrections
+                            self.logger.critical("Applied Corrections:")
+                            for m in range(self.M):
+                                corr_phase = np.rad2deg(np.angle(self.iq_corrections[m]))
+                                corr_amp = 20*np.log10(abs(self.iq_corrections[m]))
+                                self.logger.critical(f"  Ch{m}: Phase={corr_phase:+7.2f}°  Amp={corr_amp:+6.2f}dB")
+                            
+                            self.logger.critical("-"*70)
+                            
+                            # Corrected phases (what DoA actually sees)
+                            self.logger.critical("Corrected Phases (after applying corrections):")
+                            for m in range(self.M):
+                                final_phase = np.rad2deg(corrected_phases[m])
+                                final_amp = 20*np.log10(abs(iq_diffs[m] * self.iq_corrections[m]))
+                                self.logger.critical(f"  Ch{m}: Phase={final_phase:+7.2f}°  Amp={final_amp:+6.2f}dB")
+                            
+                            self.logger.critical("="*70)
+                                    
                         self.logger.debug("Sync flags are set")
                         sample_sync_flag = True
                         iq_sync_flag = True
