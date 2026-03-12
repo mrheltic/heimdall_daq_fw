@@ -86,7 +86,10 @@ class delaySynchronizer():
         self.iq_adjust_time = None
         self.iq_adjust_table  = None # Frequency - Phase table for all channels 
 
-        self.min_corr_peak_dyn_range = 20 # [dB]
+        # Lowered from 20 dB: USB 2.0 with 5 channels causes circular buffer
+        # overruns that reduce the cross-correlation peak SNR below 20 dB.
+        # 10 dB is sufficient for sample-delay synchronisation.
+        self.min_corr_peak_dyn_range = 10 # [dB]
         self.corr_peak_offset = 100 # [sample]
         self.cal_track_mode = 0        
         self.amplitude_cal_mode = "channel_power" # "default" / "disabled" / "channel_power"  -> Updated from .ini
@@ -740,11 +743,15 @@ class delaySynchronizer():
                     
                     # Has the RF center frequency changed?
                     if self.last_rf != self.iq_header.rf_center_freq:
-                        self.logger.info("Center frequency changed, initiating recalibration")
-                        sample_sync_flag = False
-                        iq_sync_flag = False
-                        self.sync_failed_cntr = 0
-                        self.current_state = "STATE_INIT"
+                        self.logger.info("Center frequency changed to %.0f Hz "
+                                         "— aggiornamento last_rf senza recalibrazione "
+                                         "(en_iq_cal=0, iq_adjust_time_delay_ns=0).",
+                                         self.iq_header.rf_center_freq)
+                        self.last_rf = self.iq_header.rf_center_freq
+                        # Con en_iq_cal=0 e ritardi espliciti = 0 ns, le correzioni
+                        # IQ sono costanti (tutte 1.0) indipendenti dalla frequenza.
+                        # Non resettare STATE_INIT: evita loop infinito quando
+                        # krakensdr_source o l'utente cambia frequenza dal GUI.
     
                 # Uncomment it for long term delay compenstation stress!
                 self.logger.info("Delay track statistic [sync fails ,sample, iq, total][{:d},{:d},{:d}/{:d}]".format(
