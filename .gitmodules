@@ -1,0 +1,3 @@
+[submodule "Firmware/librtlsdr"]
+	path = Firmware/librtlsdr
+	url = https://github.com/librtlsdr/librtlsdr.git
