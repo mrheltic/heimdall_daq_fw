@@ -140,6 +140,13 @@ class delaySynchronizer():
         self.delays = np.zeros(self.M, dtype=int) # Holds the calculated samples delay
         self.iq_corrections = np.ones(self.M, dtype=np.complex64) # This vector holds the IQ compensation values
         self.iq_diff_ref = np.ones(self.M, dtype=np.complex64) # Reference IQ difference vector used in the tracking mode
+
+        # LARK fix: escape counter for STATE_SAMPLE_CAL death-spiral.
+        # If the correlation peak DR stays below threshold for N consecutive
+        # CAL frames (USB jitter / weak noise source), force-advance to
+        # STATE_FRAC_SAMPLE_CAL treating all sample delays as zero.
+        self.sample_cal_fail_cntr = 0
+        self.MAX_SAMPLE_CAL_FAILS = 5
         
         self.logger.info("Delay synchronizer initialized")
     
@@ -556,6 +563,14 @@ class delaySynchronizer():
                             self.logger.warning("Real value: {:.2f}, minimum: {:.2f}".format(dyn_range, self.min_corr_peak_dyn_range))
                             delay_update_flag = 0
                             sample_sync_flag = False # Sync can not be checked properly
+                            self.sample_cal_fail_cntr += 1
+                            if self.sample_cal_fail_cntr >= self.MAX_SAMPLE_CAL_FAILS:
+                                self.logger.warning(
+                                    "STATE_SAMPLE_CAL: {:d} consecutive low-DR failures — "
+                                    "forcing STATE_FRAC_SAMPLE_CAL (assuming delays=0)".format(
+                                        self.sample_cal_fail_cntr))
+                                self.sample_cal_fail_cntr = 0
+                                self.current_state = "STATE_FRAC_SAMPLE_CAL"
                             break
                         
                         # Calculate sample offset
@@ -580,6 +595,7 @@ class delaySynchronizer():
                         self.current_state = "STATE_SYNC_WAIT"
                         
                     if sample_sync_flag:
+                        self.sample_cal_fail_cntr = 0  # reset on success
                         self.sample_compensation_cntr+=1 # Used to track how many succesfull compenssation have been performed so far 
                         self.current_state = "STATE_FRAC_SAMPLE_CAL"  
                 #

@@ -79,7 +79,9 @@ static pthread_barrier_t rtl_init_barrier;
 
 int reconfig_trigger=0, exit_flag=0;
 int noise_source_state = 0; // Noise source state is used also to track the calibration frame status!
-int last_noise_source_state = 0;
+int last_noise_source_state = -1; /* LARK fix: force GPIO reset on first state-change so hardware
+                                     bias-tee is always driven to a known state at startup, even if
+                                     a previous run was killed while the noise source was active. */
 int gain_change_flag;
 int *new_gains;
 float *new_fs_corrections;
