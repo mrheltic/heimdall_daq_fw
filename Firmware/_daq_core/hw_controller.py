@@ -54,7 +54,11 @@ class HWC():
         self.valid_gains = [0, 9, 14, 27, 37, 77, 87, 125, 144, 157, 166, 197, 207, 229, 254, 280, 297, 328, 338, 364, 372, 386, 402, 421, 434, 439, 445, 480, 496]
         # Defined by the R820T tuner
         
-        self.cal_gain_table=np.array([[100,200,300,400,500,600,700,1700],[6, 10, 13, 14, 18, 22, 28, 28]]) # First column frequeny [MHz], second column gain index [valid_gains]
+        # L-band (1626 MHz Iridium): stock table maps to 1700 MHz → index 28
+        # (49.6 dB) which clips the internal noise source (ADC overdrive, noise
+        # LED never turns off).  Use index 18 (33.8 dB); hw_controller backs off
+        # further automatically if overdrive persists.
+        self.cal_gain_table=np.array([[100,200,300,400,500,600,700,1626,1700],[6, 10, 13, 14, 18, 22, 22, 18, 28]]) # First column frequeny [MHz], second column gain index [valid_gains]
         self.cal_gain_table[0,:]*=10**6 # Convert to Hz
         self.M = 7 # Number of receiver channels 
         self.N = 2**18 # Number of samples per channel
@@ -449,6 +453,24 @@ class HWC():
                 for m in range(self.M):
                     if(self.iq_header.adc_overdrive_flags & 1<<m):
                         self.logger.warning("Overdrive ch {:d} [{:d}]".format(m, self.iq_header.cpi_index))
+
+                # During internal-noise calibration, step gain down if ADC clips.
+                # Without this the correlation peak is corrupted and delay_sync
+                # never reaches TRACK_LOCK (noise LED stays on indefinitely).
+                if (self.noise_source_state
+                        and self.iq_header.frame_type == IQHeader.FRAME_TYPE_CAL
+                        and self.iq_header.adc_overdrive_flags):
+                    backed_off = False
+                    for m in range(self.M):
+                        if (self.iq_header.adc_overdrive_flags & (1 << m)) and self.gains[m] > 0:
+                            self.gains[m] -= 1
+                            backed_off = True
+                    if backed_off:
+                        self.logger.warning(
+                            "Calibration overdrive — backing off gain(s), flags=0x{:X} [{:d}]".format(
+                                self.iq_header.adc_overdrive_flags, self.iq_header.cpi_index))
+                        self._change_gains()
+                        self.current_state = "STATE_NOISE_CTR_WAIT"
 
                 #
                 #------------------------------------------>
