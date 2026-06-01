@@ -54,11 +54,7 @@ class HWC():
         self.valid_gains = [0, 9, 14, 27, 37, 77, 87, 125, 144, 157, 166, 197, 207, 229, 254, 280, 297, 328, 338, 364, 372, 386, 402, 421, 434, 439, 445, 480, 496]
         # Defined by the R820T tuner
         
-        # L-band (1626 MHz Iridium): stock table maps to 1700 MHz → index 28
-        # (49.6 dB) which clips the internal noise source (ADC overdrive, noise
-        # LED never turns off).  Use index 18 (33.8 dB); hw_controller backs off
-        # further automatically if overdrive persists.
-        self.cal_gain_table=np.array([[100,200,300,400,500,600,700,1626,1700],[6, 10, 13, 14, 18, 22, 22, 18, 28]]) # First column frequeny [MHz], second column gain index [valid_gains]
+        self.cal_gain_table=np.array([[100,200,300,400,500,600,700,1626,1700],[6,10,13,14,18,22,22,18,28]]) # First column frequeny [MHz], second column gain index [valid_gains]
         self.cal_gain_table[0,:]*=10**6 # Convert to Hz
         self.M = 7 # Number of receiver channels 
         self.N = 2**18 # Number of samples per channel

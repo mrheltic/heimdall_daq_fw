@@ -146,10 +146,7 @@ class delaySynchronizer():
         # CAL frames (USB jitter / weak noise source), force-advance to
         # STATE_FRAC_SAMPLE_CAL treating all sample delays as zero.
         self.sample_cal_fail_cntr = 0
-        self.MAX_SAMPLE_CAL_FAILS = 3
-        # Separate counter for fs-ppm delay-tuning loops that never converge.
-        self.sample_delay_tune_cntr = 0
-        self.MAX_SAMPLE_DELAY_TUNES = 6
+        self.MAX_SAMPLE_CAL_FAILS = 5
         
         self.logger.info("Delay synchronizer initialized")
     
@@ -590,27 +587,15 @@ class delaySynchronizer():
 
                     # Set time delay 
                     if delay_update_flag:
-                        self.sample_delay_tune_cntr += 1
-                        if self.sample_delay_tune_cntr >= self.MAX_SAMPLE_DELAY_TUNES:
-                            self.logger.warning(
-                                "STATE_SAMPLE_CAL: {:d} delay-tune cycles without convergence — "
-                                "forcing STATE_FRAC_SAMPLE_CAL (assuming delays=0)".format(
-                                    self.sample_delay_tune_cntr))
-                            self.sample_delay_tune_cntr = 0
-                            self.sample_cal_fail_cntr = 0
-                            self.delays[:] = 0
-                            self.current_state = "STATE_FRAC_SAMPLE_CAL"
-                        else:
-                            msg_byte_array = inter_module_messages.pack_msg_sample_freq_tune(self.module_identifier, fs_ppm_offsets)
-                            self.rtl_daq_socket.send(msg_byte_array)
-                            reply = self.rtl_daq_socket.recv()
-                            self.logger.debug(f"Received reply: {reply}")
-                            self.last_update_ind=self.iq_header.cpi_index
-                            self.current_state = "STATE_SYNC_WAIT"
+                        msg_byte_array = inter_module_messages.pack_msg_sample_freq_tune(self.module_identifier, fs_ppm_offsets)
+                        self.rtl_daq_socket.send(msg_byte_array)
+                        reply = self.rtl_daq_socket.recv()
+                        self.logger.debug(f"Received reply: {reply}")
+                        self.last_update_ind=self.iq_header.cpi_index
+                        self.current_state = "STATE_SYNC_WAIT"
                         
                     if sample_sync_flag:
                         self.sample_cal_fail_cntr = 0  # reset on success
-                        self.sample_delay_tune_cntr = 0
                         self.sample_compensation_cntr+=1 # Used to track how many succesfull compenssation have been performed so far 
                         self.current_state = "STATE_FRAC_SAMPLE_CAL"  
                 #
